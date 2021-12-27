@@ -28,9 +28,16 @@
     3. 动静分离服务器
         1. 静态资源直接访问nignx
         2. 动态资源直接访问nignx代理的服务器
+    4. nignx 高性能原因
+        1. epoll机制。变更触发回调直接读取。理论无上限。
+        2. master-worker机制。master进程管理worker进程
+        3. 协程机制。依附于线程的内存模型，切换开销小。遇到阻塞归还执行权，代码同步，无需加锁。
 3. 使用redis 实现分布式会话，前期使用tomcat容器的session，后期考虑app，小程序等使用token
-4. 增加本地缓存Guava
-5. 使用nginx 增加 lua缓存(lua语法是关键)=》 openrestry 配合redis 进行网络缓存 =》 引入静态资源CDN =》全局静态资源CDN。
+4. 缓存
+    1. Redis缓存。单机版。sentinal哨兵模式。集群cluster模式。
+    2. 热点本地缓存Guava
+    3. nignx proxy cache缓存
+    5. 使用nginx 增加 lua缓存(lua语法是关键)=》 openrestry 配合redis 进行网络缓存 =》 引入静态资源CDN =》全局静态资源CDN。
 
 ## 下单交易迭代流程
 1. 下单后，去缓存中扣减库存
