@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by hzllb on 2018/11/18.
+ * Created by skyl on 2018/11/18.
  */
 @Service
 public class PromoServiceImpl implements PromoService {

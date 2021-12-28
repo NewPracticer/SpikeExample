@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import com.skyl.miaoshaproject.service.ItemService;
 
 /**
- * Created by hzllb on 2020/11/18.
+ * Created by skyl on 2020/11/18.
  */
 @Controller("/item")
 @RequestMapping("/item")

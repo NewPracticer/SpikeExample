@@ -1,5 +1,6 @@
 package com.skyl.miaoshaproject.controller;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.skyl.miaoshaproject.error.BusinessException;
 import com.skyl.miaoshaproject.error.EmBusinessError;
 import com.skyl.miaoshaproject.mq.MqProducer;
@@ -8,6 +9,7 @@ import com.skyl.miaoshaproject.service.ItemService;
 import com.skyl.miaoshaproject.service.OrderService;
 import com.skyl.miaoshaproject.service.PromoService;
 import com.skyl.miaoshaproject.service.model.UserModel;
+import com.skyl.miaoshaproject.util.CodeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Controller;
@@ -15,11 +17,16 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.awt.image.RenderedImage;
+import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.*;
 
 /**
- * Created by hzllb on 2018/11/18.
+ * Created by  on 2018/11/18.
  */
 @Controller("order")
 @RequestMapping("/order")
@@ -45,11 +52,38 @@ public class OrderController extends BaseController {
 
     private ExecutorService executorService;
 
+    private RateLimiter orderCreateRateLimiter;
+
     @PostConstruct
     public void init(){
         executorService = Executors.newFixedThreadPool(20);
 
+        orderCreateRateLimiter = RateLimiter.create(300);
     }
+
+    //生成验证码
+    @RequestMapping(value = "/generateverifycode",method = {RequestMethod.GET,RequestMethod.POST})
+    @ResponseBody
+    public void generateverifycode(HttpServletResponse response) throws BusinessException, IOException {
+        String token = httpServletRequest.getParameterMap().get("token")[0];
+        if(StringUtils.isEmpty(token)){
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能生成验证码");
+        }
+        UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
+        if(userModel == null){
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能生成验证码");
+        }
+
+        Map<String,Object> map = CodeUtil.generateCodeAndPic();
+
+        redisTemplate.opsForValue().set("verify_code_"+userModel.getId(),map.get("code"));
+        redisTemplate.expire("verify_code_"+userModel.getId(),10,TimeUnit.MINUTES);
+
+        ImageIO.write((RenderedImage) map.get("codePic"), "jpeg", response.getOutputStream());
+
+
+    }
+
 
     //生成秒杀令牌
     @RequestMapping(value = "/generatetoken",method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
@@ -82,7 +116,9 @@ public class OrderController extends BaseController {
                                         @RequestParam(name="amount")Integer amount,
                                         @RequestParam(name="promoId",required = false)Integer promoId,
                                         @RequestParam(name="promoToken",required = false)String promoToken) throws BusinessException {
-
+        if(!orderCreateRateLimiter.tryAcquire()){
+            throw new BusinessException(EmBusinessError.RATELIMIT);
+        }
 
         String token = httpServletRequest.getParameterMap().get("token")[0];
         if(StringUtils.isEmpty(token)){
